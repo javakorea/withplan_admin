@@ -2,27 +2,37 @@
 <html>
 <head>
     <meta charset="EUC-KR">
-    <title>Insert title here</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>withplan admin</title>
+    <style>
+    	.admin > button{width: calc(25% - 5px); box-sizing: border-box; height: 45px; font-size:15px;}
+    	.admin > button:nth-child(2){background:red; color:#fff}
+    </style>
 </head>
 <body>
     withplan admin<br/>
     
     <!-- withplan 버튼 생성 -->
-    <button onclick="callStart()">Start</button>
-    <button onclick="callStop()">Stop</button>
-    <button onclick="callLog()">Log</button>
-    <button onclick="callConfirm()">확인</button>
-
+    <div class="admin">
+	    <button onclick="callStart()">Start</button>
+	    <button onclick="callStop()">Stop</button>
+	    <button onclick="callLog()">Log</button>
+	    <button onclick="callConfirm()">확인</button>
+	</div>
     <!-- iframe 추가 -->
-    <iframe id="iframeTarget" name="iframeTarget" style="width:100%; height:400px; border:1px solid black;"></iframe>
+    <iframe id="iframeTarget" name="iframeTarget" style="width: 100%; height: calc(100% - 55px); border: 1px solid black; display: block; position: absolute; box-sizing: border-box; right: 0;"></iframe>
 
     <!-- 자바스크립트로 버튼 클릭 시 iframe 타겟으로 페이지 로드 -->
     <script>
     function callStart() {
-        document.getElementById('iframeTarget').src = 'start.php';  // iframe에서 start.php 실행
+    	if(confirm("Start하시겠습니까?")){
+    		document.getElementById('iframeTarget').src = 'start.php';  // iframe에서 start.php 실행
+    	};
     }
     function callStop() {
-        document.getElementById('iframeTarget').src = 'stop.php';   // iframe에서 stop.php 실행
+    	if(confirm("Stop하시겠습니까?")){
+    		document.getElementById('iframeTarget').src = 'stop.php';   // iframe에서 stop.php 실행
+    	}
     }
     function callLog() {
         document.getElementById('iframeTarget').src = 'log.php';    // iframe에서 log.php 실행
@@ -49,6 +59,7 @@
             }
         }, 1000); // delay to check if iframe loaded successfully
     }
+    callConfirm();
     </script>
 </body>
 </html>
