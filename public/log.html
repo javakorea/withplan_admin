@@ -25,7 +25,7 @@
     </style>
 </head>
 <body>
-    <h1>nohup.out 로그</h1>
+    <h1 id="logTitle">nohup.out 로그</h1> <!-- 타이틀 영역 -->
     <div>
         <label for="searchInput">검색어: </label>
         <input type="text" id="searchInput">
@@ -72,6 +72,10 @@
                         endOfFileReached = true; // 데이터가 없음을 감지
                         return;
                     }
+
+                    // 파일 크기를 MB 단위로 변환하고 3자리마다 쉼표를 추가하여 타이틀에 표시
+                    const fileSizeMB = (response.fileSize).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    document.getElementById('logTitle').innerText = `nohup.out(${fileSizeMB} MB)`;
 
                     // 로그 데이터를 줄 단위로 나누고 라인 번호 및 타임스탬프 추가
                     const logLines = response.data.split("\n");
