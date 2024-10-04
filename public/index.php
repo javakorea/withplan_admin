@@ -35,7 +35,7 @@
     	}
     }
     function callLog() {
-        document.getElementById('iframeTarget').src = 'log.php';    // iframe에서 log.php 실행
+        document.getElementById('iframeTarget').src = 'log.html';    // iframe에서 log.php 실행
     }
 
     // 확인 버튼 클릭 시 https://withplankorea.com/ 로드 시도

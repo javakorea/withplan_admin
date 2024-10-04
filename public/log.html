@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그 뷰어</title>
+    <style>
+        #logContainer {
+            height: 500px;
+            overflow-y: scroll;
+            border: 1px solid #ccc;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .line-number {
+            color: gray;
+            user-select: none;
+        }
+        .highlight {
+            background-color: yellow;
+        }
+        #searchInfo {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>nohup.out 로그</h1>
+    <div>
+        <label for="searchInput">검색어: </label>
+        <input type="text" id="searchInput">
+        <button onclick="searchLogs(true)">검색</button>
+        <button onclick="findNext()">다음 찾기</button>
+    </div>
+    <div>
+        <label for="dateSelect">년월일 선택: </label>
+        <select id="dateSelect" onchange="onDateSelect()">
+            <option value="">년월일 선택</option>
+        </select>
+
+        <label for="timeSelect">시분 선택: </label>
+        <select id="timeSelect" onchange="onTimeSelect()">
+            <option value="">시분 선택</option>
+        </select>
+    </div>
+    <div id="searchInfo"></div> <!-- 검색 정보 표시 영역 -->
+    <div id="logContainer">로그를 불러오는 중...</div>
+
+    <script>
+        let linesLoaded = 10000; // 한 번에 로드할 줄 수 (1만 줄로 설정)
+        let offset = 0; // 처음은 마지막 줄부터 시작
+        let loading = false; // 중복 로드를 방지
+        let initialLoadDone = false; // 첫 로드가 완료되었는지 확인하는 플래그
+        let endOfFileReached = false; // 더 이상 데이터가 없을 때
+        let searchResults = []; // 검색된 결과를 저장
+        let currentIndex = -1; // 현재 몇 번째 결과를 보고 있는지
+        let timestamps = new Map(); // 년월일과 시분 데이터를 저장하기 위한 Map
+
+        // 로그 데이터를 불러오는 함수
+        function loadMoreLogs(initialLoad = false) {
+            if (loading || endOfFileReached) return; // 로딩 중이거나 끝에 도달했으면 중지
+            loading = true;
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', `loadLogs.php?lines=${linesLoaded}&offset=${offset}`, true);
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    const logContainer = document.getElementById('logContainer');
+
+                    if (response.endOfFile) {
+                        endOfFileReached = true; // 데이터가 없음을 감지
+                        return;
+                    }
+
+                    // 로그 데이터를 줄 단위로 나누고 라인 번호 및 타임스탬프 추가
+                    const logLines = response.data.split("\n");
+                    const numberedLogs = logLines.map((line, index) => {
+                        const lineNumber = offset + index + 1; // 줄 번호 계산
+                        const timestamp = extractTimestamp(line); // 타임스탬프 추출
+                        if (timestamp) {
+                            const date = timestamp.split(" ")[0]; // YYYY-MM-DD
+                            const time = timestamp.split(" ")[1]; // HH:MM
+                            if (!timestamps.has(date)) {
+                                timestamps.set(date, new Set());
+                            }
+                            timestamps.get(date).add(time); // 년월일에 해당하는 시분을 Set에 추가
+                        }
+                        return `<span class="line-number">${lineNumber}</span> ${line}`;
+                    }).join("\n");
+
+                    // 첫 로딩 처리 (맨 처음 한 번만 실행)
+                    if (initialLoad && !initialLoadDone) {
+                        logContainer.innerHTML = numberedLogs || "로그가 없습니다.";
+                        logContainer.scrollTop = logContainer.scrollHeight; // 스크롤을 맨 아래로 이동
+                        initialLoadDone = true; // 첫 로드 완료
+                    } else {
+                        const previousScrollHeight = logContainer.scrollHeight;
+                        logContainer.innerHTML += numberedLogs; // 새 데이터를 아래에 추가
+                        logContainer.scrollTop = previousScrollHeight; // 스크롤 위치 유지
+                    }
+
+                    offset += logLines.length; // offset을 업데이트하여 새로운 데이터를 가져오도록 함
+                    loading = false;
+
+                    populateDateSelect(); // 년월일 셀렉트 박스 업데이트
+                } else {
+                    console.error("로그 데이터를 불러오는 데 실패했습니다.");
+                    loading = false;
+                }
+            };
+            xhr.onerror = function () {
+                console.error("AJAX 요청이 실패했습니다.");
+                loading = false;
+            };
+            xhr.send();
+        }
+
+        // 타임스탬프를 추출하는 함수 (로그 시작에서만 타임스탬프 추출, 분까지만)
+        function extractTimestamp(line) {
+            const match = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})/); // 라인 시작 부분에서 'YYYY-MM-DD HH:MM'까지만 추출
+            return match ? match[0] : null;
+        }
+
+        // 년월일 셀렉트 박스를 채우는 함수
+        function populateDateSelect() {
+            const dateSelect = document.getElementById('dateSelect');
+            dateSelect.innerHTML = '<option value="">년월일 선택</option>'; // 기본 옵션 추가
+
+            // Map의 Key(년월일)를 배열로 변환하여 정렬 후 옵션 추가
+            Array.from(timestamps.keys()).sort().forEach(date => {
+                const option = document.createElement('option');
+                option.value = date;
+                option.text = date;
+                dateSelect.appendChild(option);
+            });
+        }
+
+        // 년월일 선택 시 시분 셀렉트 박스 업데이트 및 검색창에 YYYY-MM-DD 입력
+        function onDateSelect() {
+            const selectedDate = document.getElementById('dateSelect').value;
+            const timeSelect = document.getElementById('timeSelect');
+
+            if (selectedDate) {
+                // 검색창에 YYYY-MM-DD 값 입력
+                document.getElementById('searchInput').value = selectedDate;
+
+                // 시분 셀렉트 박스를 동적으로 업데이트
+                timeSelect.innerHTML = '<option value="">시분 선택</option>'; // 기본 옵션 추가
+                const times = Array.from(timestamps.get(selectedDate)).sort();
+                times.forEach(time => {
+                    const option = document.createElement('option');
+                    option.value = time;
+                    option.text = time;
+                    timeSelect.appendChild(option);
+                });
+            } else {
+                timeSelect.innerHTML = '<option value="">시분 선택</option>'; // 선택한 년월일이 없을 경우 초기화
+            }
+        }
+
+        // 시분 선택 시 검색창에 YYYY-MM-DD HH:MM 입력
+        function onTimeSelect() {
+            const selectedDate = document.getElementById('dateSelect').value;
+            const selectedTime = document.getElementById('timeSelect').value;
+            if (selectedDate && selectedTime) {
+                // 검색창에 YYYY-MM-DD HH:MM 값 입력
+                document.getElementById('searchInput').value = `${selectedDate} ${selectedTime}`;
+            }
+        }
+
+        // 검색어 입력 후 검색하는 함수
+        function searchLogs(reset = false) {
+            const searchInput = document.getElementById('searchInput').value;
+            if (!searchInput) return;
+
+            const logContainer = document.getElementById('logContainer');
+            const logs = logContainer.innerHTML;
+
+            // 기존 하이라이트 제거
+            logContainer.innerHTML = logs.replace(/<span class="highlight">(.*?)<\/span>/g, "$1");
+
+            // 검색어 하이라이트
+            const regex = new RegExp(searchInput, 'gi');
+            const highlightedLogs = logContainer.innerHTML.replace(regex, (match) => `<span class="highlight">${match}</span>`);
+            logContainer.innerHTML = highlightedLogs;
+
+            // 검색 결과 저장
+            searchResults = Array.from(logContainer.querySelectorAll('.highlight'));
+
+            if (reset) {
+                currentIndex = -1;
+            }
+
+            updateSearchInfo(); // 검색 정보 업데이트
+
+            findNext(); // 첫 번째 검색어로 이동
+        }
+
+        // 검색된 결과와 현재 포커스된 결과 정보를 업데이트하는 함수
+        function updateSearchInfo() {
+            const searchInfo = document.getElementById('searchInfo');
+            if (searchResults.length > 0) {
+                searchInfo.innerText = `${currentIndex + 1}번째 / 전체 ${searchResults.length}개 중`;
+            } else {
+                searchInfo.innerText = "검색 결과가 없습니다.";
+            }
+        }
+
+        // 다음 검색 결과로 이동하는 함수
+        function findNext() {
+            if (searchResults.length === 0) return; // 검색 결과가 없으면 중지
+
+            // 현재 인덱스를 다음으로 업데이트
+            currentIndex++;
+
+            // 검색 결과를 모두 순회했으면 처음으로 돌아감
+            if (currentIndex >= searchResults.length) {
+                currentIndex = 0;
+                alert("검색 결과가 끝났습니다. 처음부터 다시 검색합니다.");
+            }
+
+            // 현재 검색 결과로 스크롤
+            const currentMatch = searchResults[currentIndex];
+            currentMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // 검색 정보 업데이트
+            updateSearchInfo();
+        }
+
+        // 처음 10,000줄 로드 (최신 로그가 위에 표시되도록)
+        document.addEventListener('DOMContentLoaded', function() {
+            if (!initialLoadDone) {
+                loadMoreLogs(true); // 첫 로딩을 DOMContentLoaded에서만 실행
+
+                // 스크롤 이벤트 감지
+                setTimeout(function(){
+                    const logContainer = document.getElementById('logContainer');
+                    logContainer.addEventListener('scroll', function () {
+                        // 초기 로딩 중에는 스크롤 이벤트를 무시
+                        if (!initialLoadDone || endOfFileReached) return;
+
+                        // 스크롤이 맨 아래에 도달했을 때만 추가 데이터를 불러옴
+                        if (logContainer.scrollTop + logContainer.clientHeight >= logContainer.scrollHeight - 1) {
+                            if (!loading) { // 로딩 중이 아닐 때만 실행
+                                loadMoreLogs(); // offset을 증가시키며 더 이전의 로그를 불러옴
+                            }
+                        }
+                    });
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
