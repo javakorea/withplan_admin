@@ -33,16 +33,24 @@
         <button onclick="findNext()">다음 찾기</button>
     </div>
     <div>
-        <label for="dateSelect">년월일 선택: </label>
+        <label for="dateSelect">년월일</label>
         <select id="dateSelect" onchange="onDateSelect()">
             <option value="">년월일 선택</option>
         </select>
 
-        <label for="timeSelect">시분 선택: </label>
+        <label for="timeSelect">시분</label>
         <select id="timeSelect" onchange="onTimeSelect()">
             <option value="">시분 선택</option>
         </select>
     </div>
+
+    <!-- 라인 이동 기능 추가 -->
+    <div>
+        <label for="lineInput">라인 번호: </label>
+        <input type="number" id="lineInput" placeholder="라인 번호 입력" value="1">
+        <button onclick="scrollToLine()">라인 이동</button>
+    </div>
+
     <div id="searchInfo"></div> <!-- 검색 정보 표시 영역 -->
     <div id="logContainer">로그를 불러오는 중...</div>
 
@@ -232,6 +240,18 @@
             updateSearchInfo();
         }
 
+        // 특정 라인으로 스크롤 이동하는 함수
+        function scrollToLine() {
+            const lineInput = document.getElementById('lineInput').value;
+            const lineElement = document.querySelector(`.line-number:nth-of-type(${lineInput})`);
+
+            if (lineElement) {
+                lineElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                alert("해당 라인을 찾을 수 없습니다.");
+            }
+        }
+
         // 처음 10,000줄 로드 (최신 로그가 위에 표시되도록)
         document.addEventListener('DOMContentLoaded', function() {
             if (!initialLoadDone) {
@@ -251,7 +271,8 @@
                             }
                         }
                     });
-                }, 3000);
+                    scrollToLine();
+                }, 1000);
             }
         });
     </script>
